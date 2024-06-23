@@ -6,8 +6,8 @@ from datetime import datetime
 
 import ollama
 
-test_dir_path = "/Tests"
-specimen_dir_path = "/Specimens"
+test_dir_path = "./Tests"
+specimen_dir_path = "./Specimens"
 
 
 def query_llm(query_text, role='user'):
@@ -82,7 +82,7 @@ def attach_header(file_content, query_used):
 
 
 def generate_unit_test(topic, context):
-    imports = "from Specimens.{} import *"
+    imports = "from Specimens.{} import *".format(topic)
     query = "Please write a series of unit tests using pytest that would be typical of code meetinb the following requirements:\n{}\ninclude this import at the top:\n{}".format(context, imports)
     print("Q: {}".format(query))
     response_datagram = query_llm(query)
@@ -114,7 +114,10 @@ def generate_and_test_specimen(topic, query):
         return response, exception_str
 
     # try to run the unit test for the scrip, testing functionality
+    start_stamp = datetime.now()
     exception_str = run_subprocess(["python", latest_test_path])
+    execution_time = datetime.now() - start_stamp
+    print("Test finished in {} ms".format(execution_time))
     return response, exception_str
 
 
@@ -130,16 +133,18 @@ def sanitize_input(raw_in):
 
 def create_specimen_from_unit_test(basename, max_tries, functions_to_generate=[]):
     """ returns a path to the created script, or None if the process failed """
+    test_path = test_dir_path + '\\' + basename + "_test.py"
     try:
-        unit_test_file = open(test_dir_path + '\\' + basename + "_test.py", "r")
+        unit_test_file = open(test_path, "r")
     except FileNotFoundError:
+        print("Could not test find file at: {}. Generating new test...".format(test_path))
         return None
     unit_text_text = unit_test_file.read()
     import_suffix = '*'
     if not functions_to_generate:
         import_suffix = ', '.join(functions_to_generate)
     import_str = "import pytest\nfrom Specimens.{} import {}".format(basename, import_suffix)
-    query_str = "Provide a python script that satisfies the following pytest unit test:\n\n{}\n{}".format(import_str, unit_text_text)
+    query_str = "Provide the contents of {}.py that satisfies the following pytest unit test:\n\n{}\n{}".format(basename, import_str, unit_text_text)
     print(query_str)
     # Send to the LLM, generate some code, and try to run it. Returns the result
     generated_code_str, exception_str = generate_and_test_specimen(basename, query_str)
