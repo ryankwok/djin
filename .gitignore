@@ -1,5 +1,7 @@
 Tests/*
 Specimens/*
+History/*
+Desigms/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

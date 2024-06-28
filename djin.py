@@ -1,3 +1,4 @@
+import os
 import re
 import subprocess
 import traceback
@@ -8,6 +9,8 @@ import ollama
 
 test_dir_path = "./Tests"
 specimen_dir_path = "./Specimens"
+history_dir_path = "./History"
+design_dir_path = "./Designs"
 
 
 def query_llm(query_text, role='user'):
@@ -32,6 +35,8 @@ def process_user_input():
 
 
 def write_to_file(file_path, payload):
+    if not os.path.exists(os.path.dirname(file_path)):
+        os.mkdir(os.path.dirname(file_path))
     f = open(file_path, "w")
     f.write(payload)
     f.close()
@@ -95,16 +100,19 @@ def generate_unit_test(topic, context):
     return latest_test_path
 
 
-def generate_and_test_specimen(topic, query):
+def generate_and_test_specimen(topic, query, iteration):
     print("Q: {}".format(query))
     response_datagram = query_llm(query)
     response = response_datagram['message']['content']
     print("A: {}".format(response))
     latest_specimen_path = specimen_dir_path + '\\' + topic + '.py'
+    latest_history_path = history_dir_path + '\\' + topic + '\\' + topic + '_' + str(iteration) + '.py'
     latest_test_path = test_dir_path + '\\' + topic + '_test.py'
     processed_code = sanitize_python(response)
     file_contents = attach_header(processed_code, query)
     write_to_file(latest_specimen_path, file_contents)
+    # in addition to saving the current specimen, save each iteration in the history subfolder
+    write_to_file(latest_history_path, file_contents)
 
     # try to run the generated python script to see if it crashes
     exception_str = run_subprocess(["python", latest_specimen_path])
@@ -113,11 +121,11 @@ def generate_and_test_specimen(topic, query):
     if not is_test_passed(exception_str):
         return response, exception_str
 
-    # try to run the unit test for the scrip, testing functionality
+    # try to run the unit test for the script, testing functionality
     start_stamp = datetime.now()
     exception_str = run_subprocess(["python", latest_test_path])
     execution_time = datetime.now() - start_stamp
-    print("Test finished in {} ms".format(execution_time))
+    print("Test {} finished in {} ms".format(latest_test_path, execution_time))
     return response, exception_str
 
 
@@ -147,7 +155,7 @@ def create_specimen_from_unit_test(basename, max_tries, functions_to_generate=[]
     query_str = "Provide the contents of {}.py that satisfies the following pytest unit test:\n\n{}\n{}".format(basename, import_str, unit_text_text)
     print(query_str)
     # Send to the LLM, generate some code, and try to run it. Returns the result
-    generated_code_str, exception_str = generate_and_test_specimen(basename, query_str)
+    generated_code_str, exception_str = generate_and_test_specimen(basename, query_str, 0)
 
     # While the code fails to run, regenerate it with a different prompt
     tries = 1
@@ -160,7 +168,7 @@ def create_specimen_from_unit_test(basename, max_tries, functions_to_generate=[]
         # Until there are no problems running the auto-generated code, regenerate it
         query_str = "There was a problem running the code: {}\n\nThe `error was: {}\n\nPlease try again".format(generated_code_str, exception_str)
         print(query_str)
-        generated_code_str, exception_str = generate_and_test_specimen(basename, query_str)
+        generated_code_str, exception_str = generate_and_test_specimen(basename, query_str, tries)
         tries += 1
     print("Got it running in {} tries!".format(tries))
     return specimen_dir_path
