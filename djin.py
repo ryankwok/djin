@@ -135,7 +135,7 @@ def is_test_passed(exception_str):
 
 
 def sanitize_input(raw_in):
-    processed = raw_in.strip()
+    processed = raw_in.strip().lower()
     return processed
 
 
