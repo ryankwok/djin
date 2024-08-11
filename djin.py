@@ -7,10 +7,10 @@ from datetime import datetime
 
 import ollama
 
-test_dir_path = "./Tests"
-specimen_dir_path = "./Specimens"
-history_dir_path = "./History"
-design_dir_path = "./Designs"
+test_dir_path = ".\\Tests"
+specimen_dir_path = ".\\Specimens"
+history_dir_path = ".\\History"
+design_dir_path = ".\\Designs"
 
 
 def query_llm(query_text, role='user'):
@@ -123,7 +123,7 @@ def generate_and_test_specimen(topic, query, iteration):
 
     # try to run the unit test for the script, testing functionality
     start_stamp = datetime.now()
-    exception_str = run_subprocess(["python", latest_test_path])
+    exception_str = run_subprocess(["pytest", latest_test_path])
     execution_time = datetime.now() - start_stamp
     print("Test {} finished in {} ms".format(latest_test_path, execution_time))
     return response, exception_str
@@ -180,14 +180,21 @@ def main():
     basename = sanitize_input(input('Please enter a basename:'))
     specimen_dir = create_specimen_from_unit_test(basename, 1000)
     if specimen_dir is not None:
+        print("Opening generated specimen: {}".format(specimen_dir))
         subprocess.Popen('explorer "{}"'.format(specimen_dir))
-        quit()
+        close_app()
     # if the name doesnt exist, assume they want to generate a test
     context = sanitize_input(input('Please provide a description of the code to be written:'))
     generated_test_filepath = generate_unit_test(basename, context)
     if generated_test_filepath is not None:
+        print("Opening generated test: {}".format(generated_test_filepath))
         subprocess.Popen('explorer "{}"'.format(generated_test_filepath))
-        quit()
+        close_app()
+
+
+def close_app():
+    print("Wish granted")
+    quit()
 
 
 if __name__ == "__main__":
