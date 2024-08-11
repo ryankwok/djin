@@ -1,3 +1,4 @@
+import difflib
 import os
 import re
 import subprocess
@@ -58,7 +59,18 @@ def sanitize_python(raw_response):
     processed = raw_response.replace('```', '')
     processed = processed.replace('"""', "'''")
     processed = re.sub(r'\s+python\s+', ' ', processed)
+    # TODO: removing sentences does not work as intended at the moment
+    # processed_removed = remove_sentences(processed)
+    print("Removed text: {}".format(get_text_diff(processed, processed)))
     return processed
+
+
+def get_text_diff(original, edited):
+    """
+    Returns a list of differences between two texts.
+    """
+    diff = difflib.unified_diff(original.splitlines(), edited.splitlines())
+    return list(diff)
 
 
 def run_subprocess(list_of_command_and_args):
@@ -67,10 +79,13 @@ def run_subprocess(list_of_command_and_args):
     try:
         subprocess.run(list_of_command_and_args, capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as e:
-        print(f"Subprocess failed with return code {e.returncode}: {e.stderr}")
+        print(f"Subprocess failed with return code {e.returncode}: {e.stderr} / {e.stdout}")
         print(' '.join(list_of_command_and_args))
         traceback.print_exc()
         exception_str = e.stderr
+        if not exception_str:
+            # if there is still no stderr then it was a unit test
+            exception_str = e.stdout
     # Then return the result of the LLM query
     return exception_str
 
@@ -84,6 +99,16 @@ def attach_header(file_content, query_used):
     return "# Generated at {}\n# Query:\n# {}\n#\n# {}".format(datetime.now(),
                                                                comment_out(query_used),
                                                                file_content)
+
+
+def remove_sentences(text):
+    """
+    removes any lines that start with a capital letter and end in punctuation
+    """
+    # pattern = r"(^|\r|\n)*[A-Z].+[.?!](\r|\n|$)"
+    # pattern = r"\n[A-Z].+[.?!]\n"
+    pattern = r"\n[A-Z].+?[.?!]\n"
+    return re.sub(pattern, "\n", text, flags=re.MULTILINE).strip()
 
 
 def generate_unit_test(topic, context):
